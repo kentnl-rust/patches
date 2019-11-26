@@ -1,0 +1,25 @@
+From 53080de3f2b362a63eba82e2278d6faab56fee06 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Tue, 26 Nov 2019 19:48:29 +1300
+Subject: Replace deprecated trim_left_matches with trim_start_matches
+
+---
+ src/json.rs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/json.rs b/src/json.rs
+index 5841a5b..2a2a207 100644
+--- a/src/json.rs
++++ b/src/json.rs
+@@ -3332,7 +3332,7 @@ mod tests {
+ 
+         // Helper function for counting indents
+         fn indents(source: &str) -> usize {
+-            let trimmed = source.trim_left_matches(' ');
++            let trimmed = source.trim_start_matches(' ');
+             source.len() - trimmed.len()
+         }
+ 
+-- 
+2.24.0
+
