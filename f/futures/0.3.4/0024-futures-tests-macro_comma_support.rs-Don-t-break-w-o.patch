@@ -1,0 +1,88 @@
+From d18bd9f5b849a832782b9027555a8f8b27dbb6bd Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/macro_comma_support.rs: Don't break w/o features
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/macro_comma_support.rs | 37 +++++++++++++++++++++++++++---------
+ 1 file changed, 28 insertions(+), 9 deletions(-)
+
+diff --git a/tests/macro_comma_support.rs b/tests/macro_comma_support.rs
+index 111f65a..e6a609b 100644
+--- a/tests/macro_comma_support.rs
++++ b/tests/macro_comma_support.rs
+@@ -1,29 +1,41 @@
+-#[macro_use]
+-extern crate futures;
+-
+-use futures::{
+-    executor::block_on,
+-    future::{self, FutureExt},
+-    task::Poll,
+-};
+-
++#[cfg(feature = "executor")]
+ #[test]
+ fn ready() {
++    use futures::{
++        executor::block_on,
++        future,
++        task::Poll,
++        ready,
++    };
++
+     block_on(future::poll_fn(|_| {
+         ready!(Poll::Ready(()),);
+         Poll::Ready(())
+     }))
+ }
+ 
++#[cfg(all(feature = "executor", feature = "async-await"))]
+ #[test]
+ fn poll() {
++    use futures::{
++        executor::block_on,
++        future::FutureExt,
++        poll,
++    };
++
+     block_on(async {
+         let _ = poll!(async {}.boxed(),);
+     })
+ }
+ 
++#[cfg(all(feature = "executor", feature = "async-await"))]
+ #[test]
+ fn join() {
++    use futures::{
++        executor::block_on,
++        join
++    };
++
+     block_on(async {
+         let future1 = async { 1 };
+         let future2 = async { 2 };
+@@ -31,8 +43,15 @@ fn join() {
+     })
+ }
+ 
++#[cfg(all(feature = "executor", feature = "async-await"))]
+ #[test]
+ fn try_join() {
++    use futures::{
++        executor::block_on,
++        future::FutureExt,
++        try_join,
++    };
++
+     block_on(async {
+         let future1 = async { 1 }.never_error();
+         let future2 = async { 2 }.never_error();
+-- 
+2.25.0
+

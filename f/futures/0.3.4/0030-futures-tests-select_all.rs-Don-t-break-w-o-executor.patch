@@ -1,0 +1,36 @@
+From d599c37d81dadb3032c0da72863f7d06a76a62e8 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/select_all.rs: Don't break w/o "executor"
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/select_all.rs | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/tests/select_all.rs b/tests/select_all.rs
+index aad977d..9a6d736 100644
+--- a/tests/select_all.rs
++++ b/tests/select_all.rs
+@@ -1,9 +1,10 @@
+-use futures::executor::block_on;
+-use futures::future::{ready, select_all};
+-use std::collections::HashSet;
+-
++#[cfg(feature = "executor")] // executor::
+ #[test]
+ fn smoke() {
++    use futures::executor::block_on;
++    use futures::future::{ready, select_all};
++    use std::collections::HashSet;
++
+     let v = vec![
+         ready(1),
+         ready(2),
+-- 
+2.25.0
+

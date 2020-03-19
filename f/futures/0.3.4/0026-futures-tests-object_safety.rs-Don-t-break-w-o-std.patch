@@ -1,0 +1,33 @@
+From 4f73d045ae4000ec02570c7a271594ac4cf710b6 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/object_safety.rs: Don't break w/o "std"
+
+Fortunately, the author of this test used the same style
+I've been employing in my other patches to tests/
+
+Therefor, fixing this to work properly without the "std" feature
+is a simple one line change.
+
+Tests now pass for this in all valid feature combinations.
+
+Hat-tip to @taiki-e :)
+---
+ tests/object_safety.rs | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tests/object_safety.rs b/tests/object_safety.rs
+index 30c892f..b49ee88 100644
+--- a/tests/object_safety.rs
++++ b/tests/object_safety.rs
+@@ -28,6 +28,7 @@ fn sink() {
+     assert_is_object_safe::<&dyn Sink<(), Error = ()>>();
+ }
+ 
++#[cfg(feature = "std")] // futures::io
+ #[test]
+ fn io() {
+     // `AsyncReadExt`, `AsyncWriteExt`, `AsyncSeekExt` and `AsyncBufReadExt` are not object safe.
+-- 
+2.25.0
+

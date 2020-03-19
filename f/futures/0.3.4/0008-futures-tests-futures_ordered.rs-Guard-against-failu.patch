@@ -1,0 +1,112 @@
+From 832eee9fbb2c7474ff0850948c414a0da0b4c09a Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Sat, 14 Mar 2020 21:39:09 +1300
+Subject: futures: tests/futures_ordered.rs : Guard against failures w/o
+ features
+
+Tests in this file use varying combinations of "alloc" and "executor"
+features.
+
+Subsequently, all the imports have been relocated to inside the
+test functions to make ownership clear, and easily isolate the
+needed features, and tests have been appropriately gated
+with `#[cfg()]` blocks.
+
+Tests now avoid spurious compile failures with:
+
+  cargo hack --each-feature \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test futures_ordered
+
+  cargo hack --feature-powerset \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test futures_ordered
+
+  cargo hack --features "unstable" \
+    --each-feature \
+    --skip "unstable" \
+    test --test futures_ordered
+
+  cargo hack --features "unstable" \
+    --feature-powerset \
+    --skip unstable \
+    test --test futures_ordered
+---
+ tests/futures_ordered.rs | 31 ++++++++++++++++++++++++-------
+ 1 file changed, 24 insertions(+), 7 deletions(-)
+
+diff --git a/tests/futures_ordered.rs b/tests/futures_ordered.rs
+index d06b62f..74a220a 100644
+--- a/tests/futures_ordered.rs
++++ b/tests/futures_ordered.rs
+@@ -1,12 +1,11 @@
+-use futures::channel::oneshot;
+-use futures::executor::{block_on, block_on_stream};
+-use futures::future::{self, join, Future, FutureExt, TryFutureExt};
+-use futures::stream::{StreamExt, FuturesOrdered};
+-use futures_test::task::noop_context;
+-use std::any::Any;
+-
++#[cfg(all(feature = "alloc", feature="executor"))]
+ #[test]
+ fn works_1() {
++    use futures::channel::oneshot;
++    use futures::executor::block_on_stream;
++    use futures::stream::{StreamExt, FuturesOrdered};
++    use futures_test::task::noop_context;
++
+     let (a_tx, a_rx) = oneshot::channel::<i32>();
+     let (b_tx, b_rx) = oneshot::channel::<i32>();
+     let (c_tx, c_rx) = oneshot::channel::<i32>();
+@@ -26,8 +25,14 @@ fn works_1() {
+     assert_eq!(None, iter.next());
+ }
+ 
++#[cfg(feature = "alloc")]
+ #[test]
+ fn works_2() {
++    use futures::channel::oneshot;
++    use futures::future::{join, FutureExt};
++    use futures::stream::{StreamExt, FuturesOrdered};
++    use futures_test::task::noop_context;
++
+     let (a_tx, a_rx) = oneshot::channel::<i32>();
+     let (b_tx, b_rx) = oneshot::channel::<i32>();
+     let (c_tx, c_rx) = oneshot::channel::<i32>();
+@@ -46,8 +51,13 @@ fn works_2() {
+     assert!(stream.poll_next_unpin(&mut cx).is_ready());
+ }
+ 
++#[cfg(feature = "executor")]
+ #[test]
+ fn from_iterator() {
++    use futures::executor::block_on;
++    use futures::future;
++    use futures::stream::{StreamExt, FuturesOrdered};
++
+     let stream = vec![
+         future::ready::<i32>(1),
+         future::ready::<i32>(2),
+@@ -57,8 +67,15 @@ fn from_iterator() {
+     assert_eq!(block_on(stream.collect::<Vec<_>>()), vec![1,2,3]);
+ }
+ 
++#[cfg(feature = "alloc")]
+ #[test]
+ fn queue_never_unblocked() {
++    use futures::channel::oneshot;
++    use futures::future::{self, Future, TryFutureExt};
++    use futures::stream::{StreamExt, FuturesOrdered};
++    use futures_test::task::noop_context;
++    use std::any::Any;
++
+     let (_a_tx, a_rx) = oneshot::channel::<Box<dyn Any + Send>>();
+     let (b_tx, b_rx) = oneshot::channel::<Box<dyn Any + Send>>();
+     let (c_tx, c_rx) = oneshot::channel::<Box<dyn Any + Send>>();
+-- 
+2.25.0
+

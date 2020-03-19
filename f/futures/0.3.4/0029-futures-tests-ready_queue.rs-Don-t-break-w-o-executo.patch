@@ -1,0 +1,38 @@
+From 528256fb090be7110fdc6ac59dbaaac271975c07 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/ready_queue.rs: Don't break w/o "executor"
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/recurse.rs | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/tests/recurse.rs b/tests/recurse.rs
+index 2920a41..d3f4124 100644
+--- a/tests/recurse.rs
++++ b/tests/recurse.rs
+@@ -1,10 +1,11 @@
+-use futures::executor::block_on;
+-use futures::future::{self, FutureExt, BoxFuture};
+-use std::sync::mpsc;
+-use std::thread;
+-
++#[cfg(feature = "executor")] // executor::
+ #[test]
+ fn lots() {
++    use futures::executor::block_on;
++    use futures::future::{self, FutureExt, BoxFuture};
++    use std::sync::mpsc;
++    use std::thread;
++
+     fn do_it(input: (i32, i32)) -> BoxFuture<'static, i32> {
+         let (n, x) = input;
+         if n == 0 {
+-- 
+2.25.0
+

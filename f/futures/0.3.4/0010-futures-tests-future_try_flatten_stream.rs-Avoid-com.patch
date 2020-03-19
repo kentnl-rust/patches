@@ -1,0 +1,173 @@
+From 7ec8bb2b1fb254d1195f08a9909b24167b059a46 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Sat, 14 Mar 2020 23:32:27 +1300
+Subject: futures: tests/future_try_flatten_stream.rs: Avoid compile failures
+
+Two of the tests in this file are dependent on the "executor" feature.
+
+All imports reorganized into their nearest proximal necessary location
+to make import ownership clearer, and gated tests out by feature
+requirements with `#[cfg()]`
+
+No spurious build errors or test failures now with:
+
+  cargo hack --each-feature \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test future_try_flatten_stream
+
+  cargo hack --feature-powerset \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test future_try_flatten_stream
+
+  cargo hack --features "unstable" \
+    --each-feature \
+    --skip "unstable" \
+    test --test future_try_flatten_stream
+
+  cargo hack --features "unstable" \
+    --feature-powerset \
+    --skip unstable \
+    test --test future_try_flatten_stream
+---
+ tests/future_try_flatten_stream.rs | 98 +++++++++++++++++-------------
+ 1 file changed, 55 insertions(+), 43 deletions(-)
+
+diff --git a/tests/future_try_flatten_stream.rs b/tests/future_try_flatten_stream.rs
+index 082c5ef..aa85ed0 100644
+--- a/tests/future_try_flatten_stream.rs
++++ b/tests/future_try_flatten_stream.rs
+@@ -1,13 +1,10 @@
+-use core::marker::PhantomData;
+-use core::pin::Pin;
+-use futures::executor::block_on_stream;
+-use futures::future::{ok, err, TryFutureExt};
+-use futures::sink::Sink;
+-use futures::stream::{self, Stream, StreamExt};
+-use futures::task::{Context, Poll};
+-
++#[cfg(feature = "executor")]
+ #[test]
+ fn successful_future() {
++    use futures::executor::block_on_stream;
++    use futures::future::{ok, TryFutureExt};
++    use futures::stream::{self, StreamExt};
++
+     let stream_items = vec![17, 19];
+     let future_of_a_stream = ok::<_, bool>(stream::iter(stream_items).map(Ok));
+ 
+@@ -19,20 +16,28 @@ fn successful_future() {
+     assert_eq!(None, iter.next());
+ }
+ 
+-struct PanickingStream<T, E> {
+-    _marker: PhantomData<(T, E)>
+-}
++#[cfg(feature = "executor")]
++#[test]
++fn failed_future() {
++    use core::marker::PhantomData;
++    use core::pin::Pin;
++    use futures::executor::block_on_stream;
++    use futures::future::{err, TryFutureExt};
++    use futures::stream::Stream;
++    use futures::task::{Context, Poll};
+ 
+-impl<T, E> Stream for PanickingStream<T, E> {
+-    type Item = Result<T, E>;
++    struct PanickingStream<T, E> {
++        _marker: PhantomData<(T, E)>
++    }
++
++    impl<T, E> Stream for PanickingStream<T, E> {
++        type Item = Result<T, E>;
+ 
+-    fn poll_next(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+-        panic!()
++        fn poll_next(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
++            panic!()
++        }
+     }
+-}
+ 
+-#[test]
+-fn failed_future() {
+     let future_of_a_stream = err::<PanickingStream<bool, u32>, _>(10);
+     let stream = future_of_a_stream.try_flatten_stream();
+     let mut iter = block_on_stream(stream);
+@@ -40,37 +45,44 @@ fn failed_future() {
+     assert_eq!(None, iter.next());
+ }
+ 
+-struct StreamSink<T, E, Item>(PhantomData<(T, E, Item)>);
++#[test]
++fn assert_impls() {
++    use core::marker::PhantomData;
++    use core::pin::Pin;
++    use futures::sink::Sink;
++    use futures::stream::Stream;
++    use futures::task::{Context, Poll};
++    use futures::future::{ok, TryFutureExt};
+ 
+-impl<T, E, Item> Stream for StreamSink<T, E, Item> {
+-    type Item = Result<T, E>;
+-    fn poll_next(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+-        panic!()
+-    }
+-}
++    struct StreamSink<T, E, Item>(PhantomData<(T, E, Item)>);
+ 
+-impl<T, E, Item> Sink<Item> for StreamSink<T, E, Item> {
+-    type Error = E;
+-    fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+-        panic!()
+-    }
+-    fn start_send(self: Pin<&mut Self>, _: Item) -> Result<(), Self::Error> {
+-        panic!()
++    impl<T, E, Item> Stream for StreamSink<T, E, Item> {
++        type Item = Result<T, E>;
++        fn poll_next(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
++            panic!()
++        }
+     }
+-    fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+-        panic!()
+-    }
+-    fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+-        panic!()
++
++    impl<T, E, Item> Sink<Item> for StreamSink<T, E, Item> {
++        type Error = E;
++        fn poll_ready(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
++            panic!()
++        }
++        fn start_send(self: Pin<&mut Self>, _: Item) -> Result<(), Self::Error> {
++            panic!()
++        }
++        fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
++            panic!()
++        }
++        fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
++            panic!()
++        }
+     }
+-}
+ 
+-fn assert_stream<S: Stream>(_: &S) {}
+-fn assert_sink<S: Sink<Item>, Item>(_: &S) {}
+-fn assert_stream_sink<S: Stream + Sink<Item>, Item>(_: &S) {}
++    fn assert_stream<S: Stream>(_: &S) {}
++    fn assert_sink<S: Sink<Item>, Item>(_: &S) {}
++    fn assert_stream_sink<S: Stream + Sink<Item>, Item>(_: &S) {}
+ 
+-#[test]
+-fn assert_impls() {
+     let s = ok(StreamSink::<(), (), ()>(PhantomData)).try_flatten_stream();
+     assert_stream(&s);
+     assert_sink(&s);
+-- 
+2.25.0
+

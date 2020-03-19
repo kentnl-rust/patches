@@ -1,0 +1,47 @@
+From 34ad340d72f59bd9db29d46ce781d57b138455cd Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/stream_catch_unwind.rs: Don't break w/o "executor"
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/stream_catch_unwind.rs | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/tests/stream_catch_unwind.rs b/tests/stream_catch_unwind.rs
+index 8b23a0a..94c7a75 100644
+--- a/tests/stream_catch_unwind.rs
++++ b/tests/stream_catch_unwind.rs
+@@ -1,8 +1,9 @@
+-use futures::executor::block_on_stream;
+-use futures::stream::{self, StreamExt};
+-
++#[cfg(feature = "executor")]
+ #[test]
+ fn panic_in_the_middle_of_the_stream() {
++    use futures::executor::block_on_stream;
++    use futures::stream::{self, StreamExt};
++
+     let stream = stream::iter(vec![Some(10), None, Some(11)]);
+ 
+     // panic on second element
+@@ -14,8 +15,12 @@ fn panic_in_the_middle_of_the_stream() {
+     assert!(iter.next().is_none());
+ }
+ 
++#[cfg(feature = "executor")]
+ #[test]
+ fn no_panic() {
++    use futures::executor::block_on_stream;
++    use futures::stream::{self, StreamExt};
++
+     let stream = stream::iter(vec![10, 11, 12]);
+ 
+     let mut iter = block_on_stream(stream.catch_unwind());
+-- 
+2.25.0
+

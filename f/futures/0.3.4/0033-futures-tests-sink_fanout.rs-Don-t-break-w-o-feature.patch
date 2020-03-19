@@ -1,0 +1,40 @@
+From deb9e3411c71a6d889f9d9bc076c366e8570c1a7 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/sink_fanout.rs: Don't break w/o features
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/sink_fanout.rs | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/tests/sink_fanout.rs b/tests/sink_fanout.rs
+index e57b2d8..62f32f2 100644
+--- a/tests/sink_fanout.rs
++++ b/tests/sink_fanout.rs
+@@ -1,11 +1,12 @@
+-use futures::channel::mpsc;
+-use futures::executor::block_on;
+-use futures::future::join3;
+-use futures::sink::SinkExt;
+-use futures::stream::{self, StreamExt};
+-
++#[cfg(all(feature = "alloc", feature="std", feature="executor"))] // channel::mpsc, executor::
+ #[test]
+ fn it_works() {
++    use futures::channel::mpsc;
++    use futures::executor::block_on;
++    use futures::future::join3;
++    use futures::sink::SinkExt;
++    use futures::stream::{self, StreamExt};
++
+     let (tx1, rx1) = mpsc::channel(1);
+     let (tx2, rx2) = mpsc::channel(2);
+     let tx = tx1.fanout(tx2).sink_map_err(|_| ());
+-- 
+2.25.0
+

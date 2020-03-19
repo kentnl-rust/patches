@@ -1,0 +1,80 @@
+From 8930f910cdb9ac54011837f010b41ad881d916be Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Sat, 14 Mar 2020 18:28:32 +1300
+Subject: futures: tests/buffer_unordered.rs: Guard against compile fails w/o
+ features
+
+The one test in this file requires all of:
+- alloc
+- std
+- executor
+
+To run, so this test is omitted without all these features present.
+
+Imports moved to inside the test case to discourage blind test
+extension, and to simplify avoidance of "unused" warnings.
+
+Tests now compile with the following:
+
+  cargo hack --each-feature \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test buffer_unordered
+
+  cargo hack --feature-powerset \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test buffer_unordered
+
+  cargo hack --features "unstable" \
+    --each-feature \
+    --skip "unstable" \
+    test --test buffer_unordered
+
+  cargo hack --features "unstable" \
+    --feature-powerset \
+    --skip unstable \
+    test --test buffer_unordered
+
+Tests also *usually* pass with a variation of the above when passed
+
+  cargo hack <...> test --test buffer_unordered \
+    -- -Z unstable-options --include-ignored
+
+However, I still personally see lockups occurring for no obvious reason
+as per https://github.com/rust-lang/futures-rs/issues/1790
+---
+ tests/buffer_unordered.rs | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/tests/buffer_unordered.rs b/tests/buffer_unordered.rs
+index 1c559c8..6485a1e 100644
+--- a/tests/buffer_unordered.rs
++++ b/tests/buffer_unordered.rs
+@@ -1,13 +1,14 @@
+-use futures::channel::{oneshot, mpsc};
+-use futures::executor::{block_on, block_on_stream};
+-use futures::sink::SinkExt;
+-use futures::stream::StreamExt;
+-use std::sync::mpsc as std_mpsc;
+-use std::thread;
+-
++#[cfg(all(feature = "alloc", feature = "std", feature = "executor"))]
+ #[test]
+ #[ignore] // FIXME: https://github.com/rust-lang/futures-rs/issues/1790
+ fn works() {
++    use futures::channel::{oneshot, mpsc};
++    use futures::executor::{block_on, block_on_stream};
++    use futures::sink::SinkExt;
++    use futures::stream::StreamExt;
++    use std::sync::mpsc as std_mpsc;
++    use std::thread;
++
+     const N: usize = 4;
+ 
+     let (mut tx, rx) = mpsc::channel(1);
+-- 
+2.25.0
+

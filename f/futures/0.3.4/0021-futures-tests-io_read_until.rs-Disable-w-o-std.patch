@@ -1,0 +1,28 @@
+From 10f4d69f71a130176b3206512828305441bd808f Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/io_read_until.rs: Disable w/o "std"
+
+This whole test file is simple enough, and uses only the one
+import, so the whole file has been gated out when "std" is missing
+via a file-global `#![cfg()]`
+
+Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/io_window.rs | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/tests/io_window.rs b/tests/io_window.rs
+index 98df69c..8cc41a3 100644
+--- a/tests/io_window.rs
++++ b/tests/io_window.rs
+@@ -1,3 +1,4 @@
++#![cfg(feature = "std")]
+ use futures::io::Window;
+ 
+ #[test]
+-- 
+2.25.0
+

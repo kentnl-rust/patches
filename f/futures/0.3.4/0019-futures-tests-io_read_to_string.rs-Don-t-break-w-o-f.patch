@@ -1,0 +1,75 @@
+From 4f56f1f0129035c543b0b5bc0cf7c0a38ccc3602 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/io_read_to_string.rs: Don't break w/o features
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/io_read_to_string.rs | 39 +++++++++++++++++++++-----------------
+ 1 file changed, 22 insertions(+), 17 deletions(-)
+
+diff --git a/tests/io_read_to_string.rs b/tests/io_read_to_string.rs
+index db825af..0a79a22 100644
+--- a/tests/io_read_to_string.rs
++++ b/tests/io_read_to_string.rs
+@@ -1,13 +1,9 @@
+-use futures::executor::block_on;
+-use futures::future::{Future, FutureExt};
+-use futures::stream::{self, StreamExt, TryStreamExt};
+-use futures::io::{AsyncReadExt, Cursor};
+-use futures::task::Poll;
+-use futures_test::io::AsyncReadTestExt;
+-use futures_test::task::noop_context;
+-
++#[cfg(all(feature = "std", feature = "executor"))]
+ #[test]
+ fn read_to_string() {
++    use futures::executor::block_on;
++    use futures::io::{AsyncReadExt, Cursor};
++
+     let mut c = Cursor::new(&b""[..]);
+     let mut v = String::new();
+     assert_eq!(block_on(c.read_to_string(&mut v)).unwrap(), 0);
+@@ -23,17 +19,26 @@ fn read_to_string() {
+     assert!(block_on(c.read_to_string(&mut v)).is_err());
+ }
+ 
+-fn run<F: Future + Unpin>(mut f: F) -> F::Output {
+-    let mut cx = noop_context();
+-    loop {
+-        if let Poll::Ready(x) = f.poll_unpin(&mut cx) {
+-            return x;
+-        }
+-    }
+-}
+-
++#[cfg(feature = "std")]
+ #[test]
+ fn interleave_pending() {
++    use futures::future::Future;
++    use futures::stream::{self, StreamExt, TryStreamExt};
++    use futures::io::AsyncReadExt;
++    use futures_test::io::AsyncReadTestExt;
++
++    fn run<F: Future + Unpin>(mut f: F) -> F::Output {
++        use futures::future::FutureExt;
++        use futures_test::task::noop_context;
++        use futures::task::Poll;
++
++        let mut cx = noop_context();
++        loop {
++            if let Poll::Ready(x) = f.poll_unpin(&mut cx) {
++                return x;
++            }
++        }
++    }
+     let mut buf = stream::iter(vec![&b"12"[..], &b"33"[..], &b"3"[..]])
+         .map(Ok)
+         .into_async_read()
+-- 
+2.25.0
+

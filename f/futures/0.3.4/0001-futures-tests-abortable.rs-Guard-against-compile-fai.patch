@@ -1,0 +1,90 @@
+From 56cff64177316f0bb849a6b459b5b6fee446cf46 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Sat, 14 Mar 2020 15:30:56 +1300
+Subject: futures: tests/abortable.rs: Guard against compile failures w/o
+ features
+
+All tests in this file use both "alloc" and "executor" features.
+
+Subsequently, all the tests are inherently disabled without both these
+features turned on.
+
+"use" declaration interned into their various tests to make it cleaner
+to identify what tests are consuming which functionality, and keep the
+number of `#[cfg()]` blocks to a minimum.
+
+Tests now pass with:
+
+  cargo hack --each-feature \
+      --skip bilock \
+      --skip cfg-target-has-atomic \
+      --skip read-initializer \
+      test --test abortable
+
+  cargo hack --feature-powerset \
+      --skip bilock \
+      --skip cfg-target-has-atomic \
+      --skip read-initializer \
+      test --test abortable
+
+  cargo hack --features "unstable" --each-feature \
+      test --test abortable
+
+  cargo hack --features "unstable" --feature-powerset \
+      test --test abortable
+---
+ tests/abortable.rs | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
+
+diff --git a/tests/abortable.rs b/tests/abortable.rs
+index 5925c9a..fcbabe9 100644
+--- a/tests/abortable.rs
++++ b/tests/abortable.rs
+@@ -1,11 +1,10 @@
+-use futures::channel::oneshot;
+-use futures::executor::block_on;
+-use futures::future::{abortable, Aborted, FutureExt};
+-use futures::task::{Context, Poll};
+-use futures_test::task::new_count_waker;
+-
++#[cfg(all(feature = "alloc", feature = "executor"))]
+ #[test]
+ fn abortable_works() {
++    use futures::channel::oneshot;
++    use futures::future::{abortable, Aborted};
++    use futures::executor::block_on;
++
+     let (_tx, a_rx) = oneshot::channel::<()>();
+     let (abortable_rx, abort_handle) = abortable(a_rx);
+ 
+@@ -13,8 +12,14 @@ fn abortable_works() {
+     assert_eq!(Err(Aborted), block_on(abortable_rx));
+ }
+ 
++#[cfg(all(feature = "alloc", feature = "executor"))]
+ #[test]
+ fn abortable_awakens() {
++    use futures::channel::oneshot;
++    use futures::future::{abortable, Aborted, FutureExt};
++    use futures::task::{Context, Poll};
++    use futures_test::task::new_count_waker;
++
+     let (_tx, a_rx) = oneshot::channel::<()>();
+     let (mut abortable_rx, abort_handle) = abortable(a_rx);
+ 
+@@ -28,8 +33,12 @@ fn abortable_awakens() {
+     assert_eq!(Poll::Ready(Err(Aborted)), abortable_rx.poll_unpin(&mut cx));
+ }
+ 
++#[cfg(all(feature = "alloc", feature = "executor"))]
+ #[test]
+ fn abortable_resolves() {
++    use futures::channel::oneshot;
++    use futures::future::abortable;
++    use futures::executor::block_on;
+     let (tx, a_rx) = oneshot::channel::<()>();
+     let (abortable_rx, _abort_handle) = abortable(a_rx);
+ 
+-- 
+2.25.0
+

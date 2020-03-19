@@ -1,0 +1,70 @@
+From 48aba9322e637bca273286cab098fc4f1d08a018 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Sat, 14 Mar 2020 18:06:11 +1300
+Subject: futures: tests/atomic_waker.rs: Guard against failures w/o executor
+
+This test file has only one test, and it requires feature = executor
+
+Subsequently, all the imports have been moved inside the test to guard
+against accidental blind extension, and the test itself is gated with
+a '#[cfg()]`
+
+These tests now pass with:
+
+  cargo hack --each-feature \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test atomic_waker
+
+  cargo hack --feature-powerset \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test atomic_waker
+
+  cargo hack --features "unstable" \
+    --each-feature \
+    --skip "unstable" \
+    test --test atomic_waker
+
+  cargo hack --features "unstable" \
+    --feature-powerset \
+    --skip unstable \
+    test --test atomic_waker
+---
+ tests/atomic_waker.rs | 19 ++++++++++---------
+ 1 file changed, 10 insertions(+), 9 deletions(-)
+
+diff --git a/tests/atomic_waker.rs b/tests/atomic_waker.rs
+index d9ce753..5693bd0 100644
+--- a/tests/atomic_waker.rs
++++ b/tests/atomic_waker.rs
+@@ -1,14 +1,15 @@
+-use std::sync::atomic::AtomicUsize;
+-use std::sync::atomic::Ordering;
+-use std::sync::Arc;
+-use std::thread;
+-
+-use futures::executor::block_on;
+-use futures::future::poll_fn;
+-use futures::task::{AtomicWaker, Poll};
+-
++#[cfg(feature = "executor")]
+ #[test]
+ fn basic() {
++    use std::sync::atomic::AtomicUsize;
++    use std::sync::atomic::Ordering;
++    use std::sync::Arc;
++    use std::thread;
++
++    use futures::executor::block_on;
++    use futures::future::poll_fn;
++    use futures::task::{AtomicWaker, Poll};
++
+     let atomic_waker = Arc::new(AtomicWaker::new());
+     let atomic_waker_copy = atomic_waker.clone();
+ 
+-- 
+2.25.0
+

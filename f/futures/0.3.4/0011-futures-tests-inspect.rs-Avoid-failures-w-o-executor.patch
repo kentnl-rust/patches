@@ -1,0 +1,55 @@
+From 9e956fae20e1285a2481049c862e2828b7b07422 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Sun, 15 Mar 2020 00:11:04 +1300
+Subject: futures: tests/inspect.rs: Avoid failures w/o "executor"
+
+- imports relocated inside the test unit
+- gated test unit with appropriate `#[cfg()]`
+
+Tests compile and pass with:
+
+  cargo hack --each-feature \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test inspect
+
+  cargo hack --feature-powerset \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test inspect
+
+  cargo hack --features "unstable" \
+    --each-feature \
+    --skip "unstable" \
+    test --test inspect
+
+  cargo hack --features "unstable" \
+    --feature-powerset \
+    --skip unstable \
+    test --test inspect
+---
+ tests/inspect.rs | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/tests/inspect.rs b/tests/inspect.rs
+index 42f6f73..4cbe477 100644
+--- a/tests/inspect.rs
++++ b/tests/inspect.rs
+@@ -1,8 +1,9 @@
+-use futures::executor::block_on;
+-use futures::future::{self, FutureExt};
+-
++#[cfg(feature = "executor")]
+ #[test]
+ fn smoke() {
++    use futures::executor::block_on;
++    use futures::future::{self, FutureExt};
++
+     let mut counter = 0;
+ 
+     {
+-- 
+2.25.0
+

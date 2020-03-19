@@ -1,0 +1,36 @@
+From 88f88f3d66022e462cf5e7aee80a84cd8dd12ad0 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/stream_peekable.rs: Don't break w/o "executor"
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/stream_peekable.rs | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/tests/stream_peekable.rs b/tests/stream_peekable.rs
+index b65a057..c49cd72 100644
+--- a/tests/stream_peekable.rs
++++ b/tests/stream_peekable.rs
+@@ -1,9 +1,10 @@
+-use futures::executor::block_on;
+-use futures::pin_mut;
+-use futures::stream::{self, Peekable, StreamExt};
+-
++#[cfg(feature = "executor")] // executor::
+ #[test]
+ fn peekable() {
++    use futures::executor::block_on;
++    use futures::pin_mut;
++    use futures::stream::{self, Peekable, StreamExt};
++
+     block_on(async {
+         let peekable: Peekable<_> = stream::iter(vec![1u8, 2, 3]).peekable();
+         pin_mut!(peekable);
+-- 
+2.25.0
+

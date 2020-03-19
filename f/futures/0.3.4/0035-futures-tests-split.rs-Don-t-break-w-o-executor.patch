@@ -1,0 +1,138 @@
+From 44903fc399d18d51a0ed514ef80861b201d224c3 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/split.rs: Don't break w/o "executor"
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/split.rs | 101 +++++++++++++++++++++++++------------------------
+ 1 file changed, 51 insertions(+), 50 deletions(-)
+
+diff --git a/tests/split.rs b/tests/split.rs
+index 9f4f1a0..140cf3c 100644
+--- a/tests/split.rs
++++ b/tests/split.rs
+@@ -1,65 +1,66 @@
+-use futures::executor::block_on;
+-use futures::sink::{Sink, SinkExt};
+-use futures::stream::{self, Stream, StreamExt};
+-use futures::task::{Context, Poll};
+-use pin_utils::unsafe_pinned;
+-use std::pin::Pin;
++#[cfg(feature = "executor")] // executor::
++#[test]
++fn test_split() {
++    use futures::executor::block_on;
++    use futures::sink::{Sink, SinkExt};
++    use futures::stream::{self, Stream, StreamExt};
++    use futures::task::{Context, Poll};
++    use pin_utils::unsafe_pinned;
++    use std::pin::Pin;
+ 
+-struct Join<T, U> {
+-    stream: T,
+-    sink: U
+-}
++    struct Join<T, U> {
++        stream: T,
++        sink: U
++    }
+ 
+-impl<T, U> Join<T, U> {
+-    unsafe_pinned!(stream: T);
+-    unsafe_pinned!(sink: U);
+-}
++    impl<T, U> Join<T, U> {
++        unsafe_pinned!(stream: T);
++        unsafe_pinned!(sink: U);
++    }
+ 
+-impl<T: Stream, U> Stream for Join<T, U> {
+-    type Item = T::Item;
++    impl<T: Stream, U> Stream for Join<T, U> {
++        type Item = T::Item;
+ 
+-    fn poll_next(
+-        self: Pin<&mut Self>,
+-        cx: &mut Context<'_>,
+-    ) -> Poll<Option<T::Item>> {
+-        self.stream().poll_next(cx)
++        fn poll_next(
++            self: Pin<&mut Self>,
++            cx: &mut Context<'_>,
++        ) -> Poll<Option<T::Item>> {
++            self.stream().poll_next(cx)
++        }
+     }
+-}
+ 
+-impl<T, U: Sink<Item>, Item> Sink<Item> for Join<T, U> {
+-    type Error = U::Error;
++    impl<T, U: Sink<Item>, Item> Sink<Item> for Join<T, U> {
++        type Error = U::Error;
+ 
+-    fn poll_ready(
+-        self: Pin<&mut Self>,
+-        cx: &mut Context<'_>,
+-    ) -> Poll<Result<(), Self::Error>> {
+-        self.sink().poll_ready(cx)
+-    }
++        fn poll_ready(
++            self: Pin<&mut Self>,
++            cx: &mut Context<'_>,
++        ) -> Poll<Result<(), Self::Error>> {
++            self.sink().poll_ready(cx)
++        }
+ 
+-    fn start_send(
+-        self: Pin<&mut Self>,
+-        item: Item,
+-    ) -> Result<(), Self::Error> {
+-        self.sink().start_send(item)
+-    }
++        fn start_send(
++            self: Pin<&mut Self>,
++            item: Item,
++        ) -> Result<(), Self::Error> {
++            self.sink().start_send(item)
++        }
+ 
+-    fn poll_flush(
+-        self: Pin<&mut Self>,
+-        cx: &mut Context<'_>,
+-    ) -> Poll<Result<(), Self::Error>> {
+-        self.sink().poll_flush(cx)
+-    }
++        fn poll_flush(
++            self: Pin<&mut Self>,
++            cx: &mut Context<'_>,
++        ) -> Poll<Result<(), Self::Error>> {
++            self.sink().poll_flush(cx)
++        }
+ 
+-    fn poll_close(
+-        self: Pin<&mut Self>,
+-        cx: &mut Context<'_>,
+-    ) -> Poll<Result<(), Self::Error>> {
+-        self.sink().poll_close(cx)
++        fn poll_close(
++            self: Pin<&mut Self>,
++            cx: &mut Context<'_>,
++        ) -> Poll<Result<(), Self::Error>> {
++            self.sink().poll_close(cx)
++        }
+     }
+-}
+ 
+-#[test]
+-fn test_split() {
+     let mut dest: Vec<i32> = Vec::new();
+     {
+        let join = Join {
+-- 
+2.25.0
+

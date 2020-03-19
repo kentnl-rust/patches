@@ -1,0 +1,185 @@
+From 58b66025f63a2f68c6f61b618093a241cc14fcc6 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Sat, 14 Mar 2020 16:41:37 +1300
+Subject: futures: tests/arc_wake.rs: Guard against compile failures w/o alloc
+
+These tests all use 'alloc'.
+
+I could have just blocked this whole file out with a file global
+
+  #![cfg(feature=alloc)]
+
+However, in consideration of future proofing, I instead opted to
+reduce sharing of common logic so this test can be more clearly updated
+in future, while also minimizing the risk of warnings about unused
+things.
+
+Therin, the individual test cases control the required features instead
+of the required features being controlled at the file level.
+
+    Tests now pass with:
+
+      cargo hack --each-feature \
+          --skip bilock \
+          --skip cfg-target-has-atomic \
+          --skip read-initializer \
+          test --test arc_wake
+
+      cargo hack --feature-powerset \
+          --skip bilock \
+          --skip cfg-target-has-atomic \
+          --skip read-initializer \
+          test --test arc_wake
+
+      cargo hack --features "unstable" --each-feature \
+          --skip unstable \
+          test --test arc_wake
+
+      cargo hack --features "unstable" --feature-powerset \
+          --skip unstable \
+          test --test arc_wake
+---
+ tests/arc_wake.rs | 107 ++++++++++++++++++++++++----------------------
+ 1 file changed, 57 insertions(+), 50 deletions(-)
+
+diff --git a/tests/arc_wake.rs b/tests/arc_wake.rs
+index 1940e4f..38217f0 100644
+--- a/tests/arc_wake.rs
++++ b/tests/arc_wake.rs
+@@ -1,60 +1,79 @@
+-use futures::task::{self, ArcWake, Waker};
+-use std::sync::{Arc, Mutex};
++#[cfg(feature = "alloc")]
++mod countingwaker {
++    use futures::task::{self, ArcWake, Waker};
++    use std::sync::{Arc, Mutex};
+ 
+-struct CountingWaker {
+-    nr_wake: Mutex<i32>,
+-}
++    struct CountingWaker {
++        nr_wake: Mutex<i32>,
++    }
+ 
+-impl CountingWaker {
+-    fn new() -> CountingWaker {
+-        CountingWaker {
+-            nr_wake: Mutex::new(0),
++    impl CountingWaker {
++        fn new() -> CountingWaker {
++            CountingWaker {
++                nr_wake: Mutex::new(0),
++            }
+         }
+-    }
+ 
+-    fn wakes(&self) -> i32 {
+-        *self.nr_wake.lock().unwrap()
++        fn wakes(&self) -> i32 {
++            *self.nr_wake.lock().unwrap()
++        }
+     }
+-}
+ 
+-impl ArcWake for CountingWaker {
+-    fn wake_by_ref(arc_self: &Arc<Self>) {
+-        let mut lock = arc_self.nr_wake.lock().unwrap();
+-        *lock += 1;
++    impl ArcWake for CountingWaker {
++        fn wake_by_ref(arc_self: &Arc<Self>) {
++            let mut lock = arc_self.nr_wake.lock().unwrap();
++            *lock += 1;
++        }
+     }
+-}
+ 
+-#[test]
+-fn create_waker_from_arc() {
+-    let some_w = Arc::new(CountingWaker::new());
++    #[test]
++    fn create_from_arc() {
++        let some_w = Arc::new(CountingWaker::new());
+ 
+-    let w1: Waker = task::waker(some_w.clone());
+-    assert_eq!(2, Arc::strong_count(&some_w));
+-    w1.wake_by_ref();
+-    assert_eq!(1, some_w.wakes());
++        let w1: Waker = task::waker(some_w.clone());
++        assert_eq!(2, Arc::strong_count(&some_w));
++        w1.wake_by_ref();
++        assert_eq!(1, some_w.wakes());
+ 
+-    let w2 = w1.clone();
+-    assert_eq!(3, Arc::strong_count(&some_w));
++        let w2 = w1.clone();
++        assert_eq!(3, Arc::strong_count(&some_w));
+ 
+-    w2.wake_by_ref();
+-    assert_eq!(2, some_w.wakes());
++        w2.wake_by_ref();
++        assert_eq!(2, some_w.wakes());
+ 
+-    drop(w2);
+-    assert_eq!(2, Arc::strong_count(&some_w));
+-    drop(w1);
+-    assert_eq!(1, Arc::strong_count(&some_w));
+-}
++        drop(w2);
++        assert_eq!(2, Arc::strong_count(&some_w));
++        drop(w1);
++        assert_eq!(1, Arc::strong_count(&some_w));
++    }
+ 
+-struct PanicWaker;
++    #[test]
++    fn ref_wake_same() {
++        let some_w = Arc::new(CountingWaker::new());
+ 
+-impl ArcWake for PanicWaker {
+-    fn wake_by_ref(_arc_self: &Arc<Self>) {
+-        panic!("WAKE UP");
++        let w1: Waker = task::waker(some_w.clone());
++        let w2 = task::waker_ref(&some_w);
++        let w3 = w2.clone();
++
++        assert!(w1.will_wake(&w2));
++        assert!(w2.will_wake(&w3));
+     }
+ }
+ 
++#[cfg(feature = "alloc")]
+ #[test]
+ fn proper_refcount_on_wake_panic() {
++    use futures::task::{self, ArcWake, Waker};
++    use std::sync::Arc;
++
++    struct PanicWaker;
++
++    impl ArcWake for PanicWaker {
++        fn wake_by_ref(_arc_self: &Arc<Self>) {
++            panic!("WAKE UP");
++        }
++    }
++
+     let some_w = Arc::new(PanicWaker);
+ 
+     let w1: Waker = task::waker(some_w.clone());
+@@ -63,15 +82,3 @@ fn proper_refcount_on_wake_panic() {
+     drop(w1);
+     assert_eq!(1, Arc::strong_count(&some_w)); // some_w
+ }
+-
+-#[test]
+-fn waker_ref_wake_same() {
+-    let some_w = Arc::new(CountingWaker::new());
+-
+-    let w1: Waker = task::waker(some_w.clone());
+-    let w2 = task::waker_ref(&some_w);
+-    let w3 = w2.clone();
+-
+-    assert!(w1.will_wake(&w2));
+-    assert!(w2.will_wake(&w3));
+-}
+-- 
+2.25.0
+

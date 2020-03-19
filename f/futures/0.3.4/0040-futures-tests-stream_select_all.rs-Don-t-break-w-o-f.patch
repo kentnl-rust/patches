@@ -1,0 +1,68 @@
+From ce81d35a51fd9a6a3598bc7d88dfaa8f5d1e8898 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/stream_select_all.rs: Don't break w/o features
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/stream_select_all.rs | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
+
+diff --git a/tests/stream_select_all.rs b/tests/stream_select_all.rs
+index eb711dd..411cb73 100644
+--- a/tests/stream_select_all.rs
++++ b/tests/stream_select_all.rs
+@@ -1,12 +1,11 @@
+-use futures::channel::mpsc;
+-use futures::executor::block_on_stream;
+-use futures::future::{self, FutureExt};
+-use futures::stream::{self, select_all, FusedStream, SelectAll, StreamExt};
+-use futures::task::Poll;
+-use futures_test::task::noop_context;
+-
++#[cfg(feature = "alloc")] // stream::SelectAll
+ #[test]
+ fn is_terminated() {
++    use futures::future::{self, FutureExt};
++    use futures::stream::{FusedStream, SelectAll, StreamExt};
++    use futures::task::Poll;
++    use futures_test::task::noop_context;
++
+     let mut cx = noop_context();
+     let mut tasks = SelectAll::new();
+ 
+@@ -30,8 +29,12 @@ fn is_terminated() {
+     assert_eq!(tasks.is_terminated(), true);
+ }
+ 
++#[cfg(feature = "executor")] // executor::
+ #[test]
+ fn issue_1626() {
++    use futures::executor::block_on_stream;
++    use futures::stream;
++
+     let a = stream::iter(0..=2);
+     let b = stream::iter(10..=14);
+ 
+@@ -48,8 +51,14 @@ fn issue_1626() {
+     assert_eq!(s.next(), None);
+ }
+ 
++#[cfg(all(feature = "alloc", feature = "std"))] // channel::mpsc
++#[cfg(feature = "executor")] // executor::
+ #[test]
+ fn works_1() {
++    use futures::channel::mpsc;
++    use futures::executor::block_on_stream;
++    use futures::stream::select_all;
++
+     let (a_tx, a_rx) = mpsc::unbounded::<u32>();
+     let (b_tx, b_rx) = mpsc::unbounded::<u32>();
+     let (c_tx, c_rx) = mpsc::unbounded::<u32>();
+-- 
+2.25.0
+

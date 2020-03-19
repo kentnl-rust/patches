@@ -1,0 +1,38 @@
+From c65247de358967e1185f621d37e0800ec63fb624 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:24:13 +1300
+Subject: futures: tests/io_read_exact.rs: Don't fail w/o executor
+
+Reflow test to move imports into test function, and then gate
+entire test function on "executor" feature.
+
+  cargo test --test io_read_exact
+
+Now compiles and passes in every valid combination of features
+( see previous commits by me in tests/ for the command )
+
+i
+---
+ tests/io_read_exact.rs | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/tests/io_read_exact.rs b/tests/io_read_exact.rs
+index 4941773..a772e34 100644
+--- a/tests/io_read_exact.rs
++++ b/tests/io_read_exact.rs
+@@ -1,8 +1,9 @@
+-use futures::executor::block_on;
+-use futures::io::AsyncReadExt;
+-
++#[cfg(feature = "executor")]
+ #[test]
+ fn read_exact() {
++    use futures::executor::block_on;
++    use futures::io::AsyncReadExt;
++
+     let mut reader: &[u8] = &[1, 2, 3, 4, 5];
+     let mut out = [0u8; 3];
+ 
+-- 
+2.25.0
+

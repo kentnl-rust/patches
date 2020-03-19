@@ -1,0 +1,81 @@
+From 905174f6d978f377d0c5752649829184d41478be Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Sun, 15 Mar 2020 23:14:32 +1300
+Subject: futures: tests/io_cursor.rs : Avoid breaking w/o features
+
+All the tests in this file consume "std" and "executor" features.
+
+As a future proofing step, and to clarify import ownership and simplify
+feature gating, imports have been pushed into the tests themselves.
+
+And all tests have been individually gated with `#[cfg()]`.
+
+Tests now compile and pass (where compiled) with:
+
+  cargo hack --each-feature \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test io_cursor
+
+  cargo hack --feature-powerset \
+    --skip bilock \
+    --skip cfg-target-has-atomic \
+    --skip read-initializer \
+    test --test io_cursor
+
+  cargo hack --features "unstable" \
+    --each-feature \
+    --skip "unstable" \
+    test --test io_cursor
+
+  cargo hack --features "unstable" \
+    --feature-powerset \
+    --skip "unstable" \
+    test --test io_cursor
+---
+ tests/io_cursor.rs | 20 ++++++++++++++------
+ 1 file changed, 14 insertions(+), 6 deletions(-)
+
+diff --git a/tests/io_cursor.rs b/tests/io_cursor.rs
+index 4f80a75..0a93c83 100644
+--- a/tests/io_cursor.rs
++++ b/tests/io_cursor.rs
+@@ -1,11 +1,12 @@
+-use assert_matches::assert_matches;
+-use futures::future::lazy;
+-use futures::io::{AsyncWrite, Cursor};
+-use futures::task::Poll;
+-use std::pin::Pin;
+-
++#[cfg(all(feature = "std", feature = "executor"))]
+ #[test]
+ fn cursor_asyncwrite_vec() {
++    use assert_matches::assert_matches;
++    use futures::future::lazy;
++    use futures::io::{AsyncWrite, Cursor};
++    use futures::task::Poll;
++    use std::pin::Pin;
++
+     let mut cursor = Cursor::new(vec![0; 5]);
+     futures::executor::block_on(lazy(|cx| {
+         assert_matches!(Pin::new(&mut cursor).poll_write(cx, &[1, 2]), Poll::Ready(Ok(2)));
+@@ -16,8 +17,15 @@ fn cursor_asyncwrite_vec() {
+     assert_eq!(cursor.into_inner(), [1, 2, 3, 4, 5, 6, 6, 7]);
+ }
+ 
++#[cfg(all(feature = "std", feature = "executor"))]
+ #[test]
+ fn cursor_asyncwrite_box() {
++    use assert_matches::assert_matches;
++    use futures::future::lazy;
++    use futures::io::{AsyncWrite, Cursor};
++    use futures::task::Poll;
++    use std::pin::Pin;
++
+     let mut cursor = Cursor::new(vec![0; 5].into_boxed_slice());
+     futures::executor::block_on(lazy(|cx| {
+         assert_matches!(Pin::new(&mut cursor).poll_write(cx, &[1, 2]), Poll::Ready(Ok(2)));
+-- 
+2.25.0
+

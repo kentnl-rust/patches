@@ -1,0 +1,77 @@
+From 4305f8e087f99385b6559186d6e1f2f20750fa15 Mon Sep 17 00:00:00 2001
+From: Kent Fredric <kentnl@gentoo.org>
+Date: Mon, 16 Mar 2020 08:50:04 +1300
+Subject: futures: tests/io_read_until.rs: Don't break w/o features
+
+- Symbols/Imports pushed down / localised
+- Tests gated with cfg()
+- Tests now build and pass with all valid feature combinations
+
+See previous commits for details and rationale
+---
+ tests/io_read_until.rs | 40 ++++++++++++++++++++++++----------------
+ 1 file changed, 24 insertions(+), 16 deletions(-)
+
+diff --git a/tests/io_read_until.rs b/tests/io_read_until.rs
+index 5152281..1e018b7 100644
+--- a/tests/io_read_until.rs
++++ b/tests/io_read_until.rs
+@@ -1,13 +1,9 @@
+-use futures::executor::block_on;
+-use futures::future::{Future, FutureExt};
+-use futures::stream::{self, StreamExt, TryStreamExt};
+-use futures::io::{AsyncBufReadExt, Cursor};
+-use futures::task::Poll;
+-use futures_test::io::AsyncReadTestExt;
+-use futures_test::task::noop_context;
+-
++#[cfg(feature = "executor")]
+ #[test]
+ fn read_until() {
++    use futures::executor::block_on;
++    use futures::io::{AsyncBufReadExt, Cursor};
++
+     let mut buf = Cursor::new(b"12");
+     let mut v = Vec::new();
+     assert_eq!(block_on(buf.read_until(b'3', &mut v)).unwrap(), 2);
+@@ -25,17 +21,29 @@ fn read_until() {
+     assert_eq!(v, []);
+ }
+ 
+-fn run<F: Future + Unpin>(mut f: F) -> F::Output {
+-    let mut cx = noop_context();
+-    loop {
+-        if let Poll::Ready(x) = f.poll_unpin(&mut cx) {
+-            return x;
+-        }
+-    }
+-}
+ 
++#[cfg(feature = "std")]
+ #[test]
+ fn maybe_pending() {
++    use futures::future::Future;
++
++    fn run<F: Future + Unpin>(mut f: F) -> F::Output {
++        use futures::future::FutureExt;
++        use futures_test::task::noop_context;
++        use futures::task::Poll;
++
++        let mut cx = noop_context();
++        loop {
++            if let Poll::Ready(x) = f.poll_unpin(&mut cx) {
++                return x;
++            }
++        }
++    }
++
++    use futures::stream::{self, StreamExt, TryStreamExt};
++    use futures::io::AsyncBufReadExt;
++    use futures_test::io::AsyncReadTestExt;
++
+     let mut buf = b"12".interleave_pending();
+     let mut v = Vec::new();
+     assert_eq!(run(buf.read_until(b'3', &mut v)).unwrap(), 2);
+-- 
+2.25.0
+
